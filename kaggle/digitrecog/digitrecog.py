@@ -48,30 +48,32 @@ if __name__ == '__main__':
     trainFeatures, testFeatures, trainLabels, testLabels = train_test_split(
         readFeatures, readLabels, test_size=0.01, random_state=42)
 
-    print (trainFeatures, trainLabels, testFeatures, testLabels)
-
     # init the nueral net
 
     inputLayer = tf.placeholder(tf.float32, [None, no_of_feat])
     # weights matrix from inputlayer to hidden layer
-    W_1 = tf.placeholder(tf.float32, [no_of_feat, 100])
-    b_1 = init_bias([100])
+    W_1 = tf.placeholder(tf.float32, [no_of_feat, 400])
+    b_1 = init_bias([400])
     # weights and bias from hidden layer  to out layer
-    W_2 = tf.placeholder(tf.float32, [100, 10])
+    W_2 = tf.placeholder(tf.float32, [400, 10])
     b_2 = init_bias([10])
     # output layer
     outLayer = tf.placeholder(tf.float32, [None, 10])
 
     # init the weights
-    W_1 = init_weights((no_of_feat, 100))
-    W_2 = init_weights((100, 10))
+    W_1 = init_weights((no_of_feat, 400))
+    W_2 = init_weights((400, 10))
     # activations
-    a_1 = tf.nn.sigmoid(tf.matmul(inputLayer, W_1) + b_1)
+    a_1 = tf.nn.tanh(tf.matmul(inputLayer, W_1) + b_1)
     a_2 = tf.matmul(a_1, W_2) + b_2
 
     # errors to minimize
-    cross_entropy = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(a_2, outLayer))
+    cross_entropy = (tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(a_2, outLayer)) +
+        0.001 * tf.nn.l2_loss(W_1) +
+        0.001 * tf.nn.l2_loss(b_1) +
+        0.001 * tf.nn.l2_loss(W_2) +
+        0.001 * tf.nn.l2_loss(b_2))
 
     trainer = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
     predict_op = tf.argmax(a_2, 1)
@@ -80,13 +82,13 @@ if __name__ == '__main__':
     sess = tf.Session()
     sess.run(init)
 
-    for i in range(300):
+    for i in range(5000):
         sess.run(trainer, feed_dict={
             inputLayer: trainFeatures, outLayer: trainLabels})
         accuracy = np.mean(np.argmax(testLabels, 1) == sess.run(
             predict_op, feed_dict={inputLayer: testFeatures,
                                    outLayer: testLabels}))
-        print ("Epoch: %d Accuracy= %.2f% %" % (i, accuracy * 100))
+        print ("Epoch: %d Accuracy= %.4f% %" % (i, accuracy * 100))
 
     testFeatures = read_file(args.test_file)
     prediction = sess.run(predict_op,
