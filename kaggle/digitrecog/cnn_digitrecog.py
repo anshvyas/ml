@@ -55,7 +55,7 @@ def init_conv_layer(input,  # the previous layer
     # add non-linearity
     layer = tf.nn.tanh(layer)
 
-    return layer, weights
+    return layer, weights, biases
 
 # used to convert 4-d output to 2-d output to serve as input for hidden
 # fully connected layer
@@ -74,11 +74,11 @@ def init_fclayers(input, num_input, num_output):
     weights = init_weights([num_input, num_output])
     biases = init_bias([num_output])
     layer = tf.nn.tanh(tf.matmul(input, weights) + biases)
-    return layer
+    return layer, weights, biases
 
 
 def shuffle_batch(input, batch_size):
-    offset = random.randint(0, (input.shape[0] / 2) - batch_size - 1)
+    offset = random.randint(0, (input.shape[0] - batch_size - 1))
     return input[offset:offset + batch_size, :]
 
 
@@ -102,14 +102,14 @@ if __name__ == '__main__':
 
     # convolutional layer 1
     fitler_size1 = 5
-    num_filters1 = 16
+    num_filters1 = 20
 
     # convolutional layer 2
     fitler_size2 = 5
-    num_filters2 = 36
+    num_filters2 = 40
 
     # fully-connected layer
-    fc_layer_size = 100
+    fc_layer_size = 400
 
     # vars for images
     img_size = 28
@@ -128,35 +128,44 @@ if __name__ == '__main__':
     outLayer = tf.placeholder(tf.float32, [None, num_classes])
 
     # spatailly connected hidden convolutional layers
-    convlayer_1, convlayerWeights_1 = init_conv_layer(input=inputconvLayer,
-                                                      num_channels=num_channels,
-                                                      filter_size=fitler_size1,
-                                                      num_filters=num_filters1
-                                                      )
-    convLayer_2, convlayerWeights_2 = init_conv_layer(input=convlayer_1,
-                                                      filter_size=fitler_size2,
-                                                      num_filters=num_filters2,
-                                                      num_channels=num_filters1)
+    convlayer_1, convlayerWeights_1, convlayerbias_1 = init_conv_layer(input=inputconvLayer,
+                                                                       num_channels=num_channels,
+                                                                       filter_size=fitler_size1,
+                                                                       num_filters=num_filters1
+                                                                       )
+    convLayer_2, convlayerWeights_2, convlayerbias_2 = init_conv_layer(input=convlayer_1,
+                                                                       filter_size=fitler_size2,
+                                                                       num_filters=num_filters2,
+                                                                       num_channels=num_filters1)
 
     flat_layer, num_features = flatten_layer(convLayer_2)
 
-    fc_layer1 = init_fclayers(
+    fc_layer1, fc_weights1, fc_bias1 = init_fclayers(
         input=flat_layer, num_input=num_features, num_output=fc_layer_size)
 
-    fc_layer2 = init_fclayers(
+    fc_layer2, fc_weights2, fc_bias2 = init_fclayers(
         input=fc_layer1, num_input=fc_layer_size, num_output=10)
 
     cross_entropy = (tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(fc_layer2, outLayer)))
+        tf.nn.softmax_cross_entropy_with_logits(fc_layer2, outLayer)) +
+        0.001 * tf.nn.l2_loss(convlayerWeights_1) +
+        0.001 * tf.nn.l2_loss(convlayerbias_1) +
+        0.001 * tf.nn.l2_loss(convlayerWeights_2) +
+        0.001 * tf.nn.l2_loss(convlayerbias_2) +
+        0.001 * tf.nn.l2_loss(fc_weights1) +
+        0.001 * tf.nn.l2_loss(fc_bias1) +
+        0.001 * tf.nn.l2_loss(fc_weights2) +
+        0.001 * tf.nn.l2_loss(fc_bias2)
+    )
 
     trainer = tf.train.AdamOptimizer(0.001).minimize(cross_entropy)
-    predict_op = tf.argmax(fc_layer2, 1)
+    predict_op = tf.argmax(tf.nn.softmax(fc_layer2), dimension=1)
 
     init = tf.initialize_all_variables()
     sess = tf.Session()
     sess.run(init)
 
-    for i in range(10000):
+    for i in range(30000):
         train_batch = shuffle_batch(trainData, 100)
         trainFeatures = train_batch[:, 1:]
         trainLabels = convert_one_hot_vectors(train_batch[:, 0])
