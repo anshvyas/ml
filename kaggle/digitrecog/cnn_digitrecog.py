@@ -73,7 +73,7 @@ def flatten_layer(layer):
 def init_fclayers(input, num_input, num_output):
     weights = init_weights([num_input, num_output])
     biases = init_bias([num_output])
-    layer = tf.nn.tanh(tf.matmul(input, weights) + biases)
+    layer = tf.nn.relu(tf.matmul(input, weights) + biases)
     return layer, weights, biases
 
 
@@ -96,20 +96,20 @@ if __name__ == '__main__':
     np.take(readData, np.random.permutation(
         readData.shape[0]), axis=0, out=readData)
     print(readData)
-    trainData = readData[0:41000, :]
-    testFeatures = readData[41001:, 1:]
-    testLabels = convert_one_hot_vectors(readData[41001:, 0])
+    trainData = readData[0:41800, :]
+    testFeatures = readData[41801:, 1:]
+    testLabels = convert_one_hot_vectors(readData[41801:, 0])
 
     # convolutional layer 1
     fitler_size1 = 5
-    num_filters1 = 20
+    num_filters1 = 32
 
     # convolutional layer 2
     fitler_size2 = 5
-    num_filters2 = 40
+    num_filters2 = 64
 
     # fully-connected layer
-    fc_layer_size = 400
+    fc_layer_size = 1024
 
     # vars for images
     img_size = 28
@@ -144,28 +144,19 @@ if __name__ == '__main__':
         input=flat_layer, num_input=num_features, num_output=fc_layer_size)
 
     fc_layer2, fc_weights2, fc_bias2 = init_fclayers(
-        input=fc_layer1, num_input=fc_layer_size, num_output=10)
+        input=tf.nn.dropout(fc_layer1, 0.5), num_input=fc_layer_size, num_output=10)
 
-    cross_entropy = (tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(fc_layer2, outLayer)) +
-        0.001 * tf.nn.l2_loss(convlayerWeights_1) +
-        0.001 * tf.nn.l2_loss(convlayerbias_1) +
-        0.001 * tf.nn.l2_loss(convlayerWeights_2) +
-        0.001 * tf.nn.l2_loss(convlayerbias_2) +
-        0.001 * tf.nn.l2_loss(fc_weights1) +
-        0.001 * tf.nn.l2_loss(fc_bias1) +
-        0.001 * tf.nn.l2_loss(fc_weights2) +
-        0.001 * tf.nn.l2_loss(fc_bias2)
-    )
+    cross_entropy = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(fc_layer2, outLayer))
 
-    trainer = tf.train.AdamOptimizer(0.001).minimize(cross_entropy)
+    trainer = tf.train.AdamOptimizer(0.0001).minimize(cross_entropy)
     predict_op = tf.argmax(tf.nn.softmax(fc_layer2), dimension=1)
 
     init = tf.initialize_all_variables()
     sess = tf.Session()
     sess.run(init)
 
-    for i in range(30000):
+    for i in range(10000):
         train_batch = shuffle_batch(trainData, 100)
         trainFeatures = train_batch[:, 1:]
         trainLabels = convert_one_hot_vectors(train_batch[:, 0])
