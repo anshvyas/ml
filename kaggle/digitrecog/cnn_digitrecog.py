@@ -11,7 +11,7 @@ def read_file(to_read):
 
 
 def init_weights(shape):
-    weights = tf.random_normal(shape, stddev=0.05)
+    weights = tf.random_normal(shape, stddev=0.05, dtype=tf.float32)
     return tf.Variable(weights)
 
 
@@ -102,14 +102,14 @@ if __name__ == '__main__':
 
     # convolutional layer 1
     fitler_size1 = 5
-    num_filters1 = 32
+    num_filters1 = 16
 
     # convolutional layer 2
     fitler_size2 = 5
-    num_filters2 = 64
+    num_filters2 = 36
 
     # fully-connected layer
-    fc_layer_size = 1024
+    fc_layer_size = 400
 
     # vars for images
     img_size = 28
@@ -146,17 +146,27 @@ if __name__ == '__main__':
     fc_layer2, fc_weights2, fc_bias2 = init_fclayers(
         input=tf.nn.dropout(fc_layer1, 0.5), num_input=fc_layer_size, num_output=10)
 
-    cross_entropy = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(fc_layer2, outLayer))
+    cross_entropy = (tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(fc_layer2, outLayer)) # +
+        # 0.0001 * tf.nn.l2_loss(convlayerWeights_1) +
+        # 0.0001 * tf.nn.l2_loss(convlayerbias_1) +
+        # 0.0001 * tf.nn.l2_loss(convlayerWeights_2) +
+        # 0.0001 * tf.nn.l2_loss(convlayerbias_2) +
+        # 0.0001 * tf.nn.l2_loss(fc_weights1) +
+        # 0.0001 * tf.nn.l2_loss(fc_bias1) +
+        # 0.0001 * tf.nn.l2_loss(fc_weights2) +
+        # 0.0001 * tf.nn.l2_loss(fc_bias2)
+    )
 
     trainer = tf.train.AdamOptimizer(0.0001).minimize(cross_entropy)
-    predict_op = tf.argmax(tf.nn.softmax(fc_layer2), dimension=1)
+
+    predict_op = tf.argmax(fc_layer2, dimension=1)
 
     init = tf.initialize_all_variables()
     sess = tf.Session()
     sess.run(init)
 
-    for i in range(10000):
+    for i in range(20000):
         train_batch = shuffle_batch(trainData, 100)
         trainFeatures = train_batch[:, 1:]
         trainLabels = convert_one_hot_vectors(train_batch[:, 0])
